@@ -98,6 +98,11 @@ def graphiql_headers(conn) do
 end
 ```
 
+GraphiQL stores the theme setting in `localStorage` under `graphiql:settings`, shared by
+every GraphiQL page on the same origin. A page with a forced `:light` or `:dark` theme
+writes that theme there, so a `:system` page on the same origin opened later starts
+with it until the user changes it in the settings dialog.
+
 A Phoenix router calls `init/1` at compile time, and an anonymous function cannot be
 stored in compiled code. In a router, use a `{module, function}` tuple or a captured
 named function such as `&MyApp.GraphiQL.headers/1`.
