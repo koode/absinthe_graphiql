@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # mise.toml is the only source of tool versions. Use the precompiled
+  # Erlang build from builds.hex.pm, and fail instead of building OTP from
+  # source when there is none.
+  MISE_ERLANG_COMPILE: "false"
+
+jobs:
+  elixir:
+    name: Elixir
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          install_args: erlang elixir
+
+      - name: Read tool versions
+        id: versions
+        run: echo "key=erlang-$(mise current erlang)-elixir-$(mise current elixir)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            deps
+            _build
+          key: mix-elixir-${{ runner.os }}-${{ steps.versions.outputs.key }}-${{ hashFiles('mix.lock') }}
+          restore-keys: mix-elixir-${{ runner.os }}-${{ steps.versions.outputs.key }}-
+
+      - run: mix local.hex --force && mix local.rebar --force
+      - run: mix deps.get
+      - run: mix format --check-formatted
+      - run: mix compile --warnings-as-errors
+      - run: mix credo
+      - run: MIX_ENV=test mix compile --warnings-as-errors
+      - run: mix test
+      - run: mix docs --warnings-as-errors
+      - run: mix hex.build
+
+  dialyzer:
+    name: Dialyzer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          install_args: erlang elixir
+
+      - name: Read tool versions
+        id: versions
+        run: echo "key=erlang-$(mise current erlang)-elixir-$(mise current elixir)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            deps
+            _build
+          key: mix-dialyzer-${{ runner.os }}-${{ steps.versions.outputs.key }}-${{ hashFiles('mix.lock') }}
+          restore-keys: mix-dialyzer-${{ runner.os }}-${{ steps.versions.outputs.key }}-
+
+      # Restore and save the PLT in separate steps, so a new PLT is saved even
+      # when Dialyzer finds a problem in the code.
+      - name: Restore PLT cache
+        id: plt-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: priv/plts
+          key: plt-${{ runner.os }}-${{ steps.versions.outputs.key }}-${{ hashFiles('mix.lock') }}
+          restore-keys: plt-${{ runner.os }}-${{ steps.versions.outputs.key }}-
+
+      - run: mix local.hex --force && mix local.rebar --force
+      - run: mix deps.get
+
+      - name: Build PLT
+        if: steps.plt-cache.outputs.cache-hit != 'true'
+        run: mix dialyzer --plt
+
+      - name: Save PLT cache
+        if: steps.plt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: priv/plts
+          key: ${{ steps.plt-cache.outputs.cache-primary-key }}
+
+      - run: mix dialyzer --format github
+
+  assets:
+    name: Assets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: assets
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          install_args: node
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('mise.toml', 'assets/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+      # The committed priv/static must be exactly what assets/ builds.
+      - name: Check that priv/static matches the build
+        working-directory: .
+        run: |
+          git diff --exit-code --stat -- priv/static
+          untracked=$(git ls-files --others --exclude-standard -- priv/static)
+          if [ -n "$untracked" ]; then
+            echo "Files in priv/static that are not committed:"
+            echo "$untracked"
+            exit 1
+          fi
