@@ -2,6 +2,7 @@ defmodule AbsintheGraphiQL.MixProject do
   use Mix.Project
 
   @version "0.1.0"
+  @source_url "https://github.com/koode/absinthe_graphiql"
 
   def project do
     [
@@ -15,6 +16,7 @@ defmodule AbsintheGraphiQL.MixProject do
       description:
         "A self-hosted GraphiQL 6 IDE for Absinthe, with subscriptions over Phoenix channels.",
       package: package(),
+      source_url: @source_url,
       docs: docs()
     ]
   end
@@ -48,7 +50,7 @@ defmodule AbsintheGraphiQL.MixProject do
   defp package do
     [
       licenses: ["MIT"],
-      links: %{"GraphiQL" => "https://github.com/graphql/graphiql"},
+      links: %{"GitHub" => @source_url, "GraphiQL" => "https://github.com/graphql/graphiql"},
       files: ~w(lib priv/static mix.exs README.md CHANGELOG.md LICENSE .formatter.exs)
     ]
   end
@@ -57,6 +59,7 @@ defmodule AbsintheGraphiQL.MixProject do
     [
       main: "readme",
       source_ref: "v#{@version}",
+      source_url: @source_url,
       extras: ["README.md", "CHANGELOG.md", "LICENSE"]
     ]
   end
