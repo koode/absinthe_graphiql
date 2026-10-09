@@ -249,6 +249,9 @@ mise exec -- mix test
 mise exec -- mix assets.test   # vitest, needs assets/node_modules (npm ci)
 ```
 
+See `CONTRIBUTING.md` for the checks to run before a pull request and the
+Conventional Commits format that commit messages use.
+
 ## License
 
 MIT. See `LICENSE`. The bundled third-party software is listed in

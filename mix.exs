@@ -60,7 +60,7 @@ defmodule AbsintheGraphiQL.MixProject do
       main: "readme",
       source_ref: "v#{@version}",
       source_url: @source_url,
-      extras: ["README.md", "CHANGELOG.md", "LICENSE"]
+      extras: ["README.md", "CHANGELOG.md", "CONTRIBUTING.md", "LICENSE"]
     ]
   end
 end
