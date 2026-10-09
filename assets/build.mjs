@@ -61,7 +61,10 @@ const cssPlugin = {
           const file = join(fontTmpDir, `font-${sha}.${fontFormats[type]}`);
           writeFileSync(file, bytes);
           count++;
-          return `url("${file}")`;
+          // A relative URL, so the absolute checkout path does not reach
+          // esbuild. It changes the minified names in app.js otherwise.
+          const url = relative(dirname(args.path), file).split("\\").join("/");
+          return `url("${url}")`;
         },
       );
       if (count === 0) throw new Error("No inline fonts found in graphiql/dist/style.css; check the build");
@@ -166,7 +169,8 @@ for (const metafile of [app.metafile, workers.metafile]) {
 }
 
 function licenseText(root, pkg) {
-  const names = readdirSync(root);
+  // Sorted, because the directory order differs between file systems.
+  const names = readdirSync(root).sort();
   const file = names.find((name) => /^(licen[cs]e|copying)(\.(md|txt))?$/i.test(name));
   const notices = names.find((name) => /^thirdpartynotices(\.txt)?$/i.test(name));
   const parts = [];
