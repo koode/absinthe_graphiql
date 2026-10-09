@@ -12,12 +12,12 @@ defmodule AbsintheGraphiQL.Assets do
   @external_resource @manifest_path
 
   @manifest @manifest_path |> File.read!() |> Jason.decode!()
+  @entries Map.delete(@manifest, "files")
   @files MapSet.new(@manifest["files"])
 
   @doc "The hashed file name of a bundle entry, for example `\"app.js\"`."
   @spec entry(String.t()) :: String.t()
-  def entry(name) when is_map_key(@manifest, name) and name != "files",
-    do: Map.fetch!(@manifest, name)
+  def entry(name) when is_map_key(@entries, name), do: Map.fetch!(@entries, name)
 
   @doc "Every file the asset route may serve."
   @spec files() :: MapSet.t(String.t())
