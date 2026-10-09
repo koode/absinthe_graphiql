@@ -69,6 +69,9 @@ defmodule AbsintheGraphiQL.PlugTest do
       assert conn.resp_body =~ ~s(<title>GraphiQL</title>)
 
       assert conn.resp_body =~
+               ~s(<link rel="icon" type="image/svg+xml" href="/graphiql/__assets__/#{Assets.entry("favicon.svg")}">)
+
+      assert conn.resp_body =~
                ~s(<script type="module" src="/graphiql/__assets__/#{Assets.entry("app.js")}">)
 
       assert conn.resp_body =~
@@ -388,7 +391,8 @@ defmodule AbsintheGraphiQL.PlugTest do
             {"app.css", "text/css"},
             {"editor.worker.js", "text/javascript"},
             {"json.worker.js", "text/javascript"},
-            {"graphql.worker.js", "text/javascript"}
+            {"graphql.worker.js", "text/javascript"},
+            {"favicon.svg", "image/svg+xml"}
           ] do
         file = Assets.entry(entry)
         conn = mounted(:get, "/__assets__/" <> file) |> call([])

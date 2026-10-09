@@ -4,6 +4,7 @@
   "editor.worker.js": "editor.worker-5TCETK7T.js",
   "json.worker.js": "json.worker-OIHJDPV2.js",
   "graphql.worker.js": "graphql.worker-E22GSGHB.js",
+  "favicon.svg": "favicon-8C7033FE.svg",
   "files": [
     "app-4KFNLZZJ.js",
     "app-TE3DTIZS.css",
@@ -19,6 +20,7 @@
     "chunk-YGNEOXTB.js",
     "editor.worker-5TCETK7T.js",
     "estree-M6JYPO7R.js",
+    "favicon-8C7033FE.svg",
     "font-16f89b26ede9-L5G75A72.woff2",
     "font-1af0ee2e409d-HICBCVTI.woff2",
     "font-1df1ae79b141-Z72STTMG.woff2",

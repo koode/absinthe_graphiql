@@ -362,6 +362,7 @@ defmodule AbsintheGraphiQL.Plug do
   defp page(mount, title, config_json) do
     css = asset_url(mount, Assets.entry("app.css"))
     js = asset_url(mount, Assets.entry("app.js"))
+    icon = asset_url(mount, Assets.entry("favicon.svg"))
 
     """
     <!doctype html>
@@ -370,6 +371,7 @@ defmodule AbsintheGraphiQL.Plug do
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>#{escape(title)}</title>
+        <link rel="icon" type="image/svg+xml" href="#{escape(icon)}">
         <link rel="stylesheet" href="#{escape(css)}">
         <script type="module" src="#{escape(js)}"></script>
         <style>

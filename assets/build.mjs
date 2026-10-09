@@ -6,6 +6,7 @@
 //   editor.worker-<hash>.js  Monaco web workers (classic scripts)
 //   json.worker-<hash>.js
 //   graphql.worker-<hash>.js
+//   favicon-<hash>.svg       page icon
 //   manifest.json            entry names and the full file list, read by
 //                            AbsintheGraphiQL.Assets at compile time
 //   THIRD_PARTY_LICENSES.txt license of every bundled package and font
@@ -111,11 +112,17 @@ if (process.env.METAFILE) {
   writeFileSync(process.env.METAFILE, JSON.stringify({ app: app.metafile, workers: workers.metafile }));
 }
 
+// The page icon, so browsers do not request /favicon.ico from the host app.
+const faviconSource = readFileSync(join(assetsDir, "src/favicon.svg"));
+const favicon = `favicon-${createHash("sha256").update(faviconSource).digest("hex").slice(0, 8).toUpperCase()}.svg`;
+writeFileSync(join(outDir, favicon), faviconSource);
+
 // ---------------------------------------------------------------- manifest
 
 const outputs = { ...app.metafile.outputs, ...workers.metafile.outputs };
 const files = Object.keys(outputs)
   .map((path) => relative(outDir, resolve(process.cwd(), path)))
+  .concat([favicon])
   .sort();
 
 for (const file of files) {
@@ -139,6 +146,7 @@ const manifest = {
   "editor.worker.js": entryOutput(workers.metafile, "src/workers/editor.worker.js"),
   "json.worker.js": entryOutput(workers.metafile, "src/workers/json.worker.js"),
   "graphql.worker.js": entryOutput(workers.metafile, "src/workers/graphql.worker.js"),
+  "favicon.svg": favicon,
   files,
 };
 
