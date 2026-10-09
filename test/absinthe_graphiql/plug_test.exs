@@ -82,7 +82,7 @@ defmodule AbsintheGraphiQL.PlugTest do
       conn = browser_get()
 
       scripts = Regex.scan(~r/<script[^>]*>(.*?)<\/script>/s, conn.resp_body)
-      assert length(scripts) == 1
+      assert [_] = scripts
       assert Enum.all?(scripts, fn [_, inline] -> String.trim(inline) == "" end)
       refute conn.resp_body =~ ~r/\son[a-z]+=/i
     end
@@ -169,8 +169,8 @@ defmodule AbsintheGraphiQL.PlugTest do
 
       refute conn.resp_body =~ "<script>alert(1)</script>"
       refute conn.resp_body =~ ~s("><script>)
-      assert length(Regex.scan(~r/<\/div>/, conn.resp_body)) == 2
-      assert length(Regex.scan(~r/<script/, conn.resp_body)) == 1
+      assert [_, _] = Regex.scan(~r/<\/div>/, conn.resp_body)
+      assert [_] = Regex.scan(~r/<script/, conn.resp_body)
       assert page_config(conn)["defaultQuery"] == evil
       assert conn.resp_body =~ "<title>&quot;&gt;&lt;script&gt;"
     end
