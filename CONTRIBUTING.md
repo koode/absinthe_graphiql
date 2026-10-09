@@ -34,7 +34,11 @@ mise exec -- mix credo
 mise exec -- mix test
 mise exec -- mix assets.test
 mise exec -- mix docs
+mise exec -- mix dialyzer
 ```
+
+CI runs the same checks, and also rebuilds `priv/static/` and fails if it differs
+from the committed files.
 
 - **Credo runs in strict mode with every [ExSlop](https://github.com/elixir-vibe/ex_slop)
   check** (`.credo.exs`). Fix a finding rather than disable it. If a check is wrong

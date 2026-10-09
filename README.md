@@ -247,6 +247,7 @@ mise trust && mise install
 mise exec -- mix deps.get
 mise exec -- mix test
 mise exec -- mix assets.test   # vitest, needs assets/node_modules (npm ci)
+mise exec -- mix dialyzer
 ```
 
 See `CONTRIBUTING.md` for the checks to run before a pull request and the
