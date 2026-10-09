@@ -30,11 +30,15 @@ Run these checks. All of them must pass.
 ```sh
 mise exec -- mix format --check-formatted
 mise exec -- mix compile --warnings-as-errors
+mise exec -- mix credo
 mise exec -- mix test
 mise exec -- mix assets.test
 mise exec -- mix docs
 ```
 
+- **Credo runs in strict mode with every [ExSlop](https://github.com/elixir-vibe/ex_slop)
+  check** (`.credo.exs`). Fix a finding rather than disable it. If a check is wrong
+  for one line, disable it for that line only and add a comment with the reason.
 - **New logic needs tests.** Elixir code gets ExUnit tests in `test/`. JavaScript in
   `assets/src/` gets vitest tests in `assets/test/`.
 - **If you change `assets/`**, run `mise exec -- mix assets.build` and commit the

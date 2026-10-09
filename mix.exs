@@ -36,7 +36,9 @@ defmodule AbsintheGraphiQL.MixProject do
       {:jason, "~> 1.2"},
       {:absinthe_phoenix, "~> 2.0", only: [:dev, :test]},
       {:phoenix, "~> 1.7", only: [:dev, :test]},
-      {:ex_doc, "~> 0.34", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false}
     ]
   end
 

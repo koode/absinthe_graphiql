@@ -5,6 +5,9 @@ defmodule AbsintheGraphiQL.Assets do
   # priv/static/manifest.json with the content-hashed file names; it is read
   # here at compile time, so a rebuilt bundle recompiles this module.
 
+  # Compile time: Application.app_dir/2 is not usable while this app compiles.
+  # Requests are served with Plug.Static from {:absinthe_graphiql, "priv/static"}.
+  # credo:disable-for-next-line ExSlop.Check.Warning.PathExpandPriv
   @manifest_path Path.expand("../../priv/static/manifest.json", __DIR__)
   @external_resource @manifest_path
 
