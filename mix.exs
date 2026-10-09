@@ -17,7 +17,8 @@ defmodule AbsintheGraphiQL.MixProject do
         "A self-hosted GraphiQL 6 IDE for Absinthe, with subscriptions over Phoenix channels.",
       package: package(),
       source_url: @source_url,
-      docs: docs()
+      docs: docs(),
+      dialyzer: dialyzer()
     ]
   end
 
@@ -38,7 +39,8 @@ defmodule AbsintheGraphiQL.MixProject do
       {:phoenix, "~> 1.7", only: [:dev, :test]},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false}
+      {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -54,6 +56,18 @@ defmodule AbsintheGraphiQL.MixProject do
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url, "GraphiQL" => "https://github.com/graphql/graphiql"},
       files: ~w(lib priv/static mix.exs README.md CHANGELOG.md LICENSE .formatter.exs)
+    ]
+  end
+
+  defp dialyzer do
+    [
+      plt_core_path: "priv/plts",
+      plt_local_path: "priv/plts",
+      # No :underspecs: AbsintheGraphiQL.Plug.init/1 accepts every
+      # Absinthe.Plug option ({atom(), term()}) and returns Absinthe.Plug's
+      # config map. A spec that is not wider than the success typing would have
+      # to copy absinthe_plug's internal config keys and option types.
+      flags: [:error_handling, :extra_return, :missing_return]
     ]
   end
 

@@ -26,3 +26,6 @@ absinthe_graphiql-*.tar
 # npm
 /assets/node_modules/
 /assets/.build/
+
+# Dialyzer PLTs (see the dialyzer config in mix.exs).
+/priv/plts/
