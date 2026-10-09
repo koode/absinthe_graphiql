@@ -256,6 +256,7 @@ defmodule AbsintheGraphiQL.Plug do
     if is_map(value) or is_binary(value), do: :ok, else: {:error, "a map or a JSON string"}
   end
 
+  @spec invalid!(atom(), term(), String.t()) :: no_return()
   defp invalid!(key, value, expected) do
     raise ArgumentError,
           "invalid #{inspect(key)} option for AbsintheGraphiQL.Plug: expected #{expected}, got: #{inspect(value)}"
