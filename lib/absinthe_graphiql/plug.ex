@@ -184,35 +184,8 @@ defmodule AbsintheGraphiQL.Plug do
 
     booleans =
       Map.new(@boolean_options, fn {key, default} ->
-        case Keyword.get(opts, key, default) do
-          value when is_boolean(value) -> {key, value}
-          other -> invalid!(key, other, "a boolean")
-        end
+        {key, fetch_valid!(opts, key, default, &is_boolean/1, "a boolean")}
       end)
-
-    socket =
-      case Keyword.get(opts, :socket) do
-        socket when is_atom(socket) -> socket
-        other -> invalid!(:socket, other, "a socket module, for example MyAppWeb.UserSocket")
-      end
-
-    title =
-      case Keyword.get(opts, :title, "GraphiQL") do
-        title when is_binary(title) -> title
-        other -> invalid!(:title, other, "a string")
-      end
-
-    theme =
-      case Keyword.get(opts, :theme, :system) do
-        theme when theme in @themes -> theme
-        other -> invalid!(:theme, other, "one of :system, :light or :dark")
-      end
-
-    csp =
-      case Keyword.get(opts, :csp, true) do
-        csp when is_boolean(csp) or is_binary(csp) -> csp
-        other -> invalid!(:csp, other, "true, false or a policy string")
-      end
 
     static =
       Plug.Static.init(
@@ -224,7 +197,33 @@ defmodule AbsintheGraphiQL.Plug do
 
     dynamic
     |> Map.merge(booleans)
-    |> Map.merge(%{socket: socket, title: title, theme: theme, csp: csp, static: static})
+    |> Map.merge(%{
+      socket:
+        fetch_valid!(
+          opts,
+          :socket,
+          nil,
+          &is_atom/1,
+          "a socket module, for example MyAppWeb.UserSocket"
+        ),
+      title: fetch_valid!(opts, :title, "GraphiQL", &is_binary/1, "a string"),
+      theme:
+        fetch_valid!(opts, :theme, :system, &(&1 in @themes), "one of :system, :light or :dark"),
+      csp:
+        fetch_valid!(
+          opts,
+          :csp,
+          true,
+          &(is_boolean(&1) or is_binary(&1)),
+          "true, false or a policy string"
+        ),
+      static: static
+    })
+  end
+
+  defp fetch_valid!(opts, key, default, valid?, expected) do
+    value = Keyword.get(opts, key, default)
+    if valid?.(value), do: value, else: invalid!(key, value, expected)
   end
 
   defp validate_dynamic!(_key, nil), do: :ok
@@ -263,47 +262,43 @@ defmodule AbsintheGraphiQL.Plug do
   end
 
   defp resolve!(conn, key, value) do
-    resolved =
-      case value do
-        fun when is_function(fun, 1) ->
-          fun.(conn)
-
-        fun when is_function(fun, 0) ->
-          fun.()
-
-        {mod, fun} when is_atom(mod) and is_atom(fun) ->
-          Code.ensure_loaded(mod)
-
-          cond do
-            function_exported?(mod, fun, 1) ->
-              apply(mod, fun, [conn])
-
-            function_exported?(mod, fun, 0) ->
-              apply(mod, fun, [])
-
-            true ->
-              raise ArgumentError,
-                    "invalid #{inspect(key)} option for AbsintheGraphiQL.Plug: " <>
-                      "#{inspect(mod)}.#{fun}/1 or #{inspect(mod)}.#{fun}/0 is not exported"
-          end
-
-        other ->
-          other
-      end
-
-    if resolved != nil do
-      case check_value(key, resolved) do
-        :ok ->
-          :ok
-
-        {:error, expected} ->
-          raise ArgumentError,
-                "invalid #{inspect(key)} option for AbsintheGraphiQL.Plug: expected the " <>
-                  "function to return #{expected} or nil, got: #{inspect(resolved)}"
-      end
-    end
-
+    resolved = call_dynamic!(conn, key, value)
+    if resolved != nil, do: check_resolved!(key, resolved)
     resolved
+  end
+
+  defp call_dynamic!(conn, _key, fun) when is_function(fun, 1), do: fun.(conn)
+  defp call_dynamic!(_conn, _key, fun) when is_function(fun, 0), do: fun.()
+
+  defp call_dynamic!(conn, key, {mod, fun}) when is_atom(mod) and is_atom(fun) do
+    Code.ensure_loaded(mod)
+
+    cond do
+      function_exported?(mod, fun, 1) ->
+        apply(mod, fun, [conn])
+
+      function_exported?(mod, fun, 0) ->
+        apply(mod, fun, [])
+
+      true ->
+        raise ArgumentError,
+              "invalid #{inspect(key)} option for AbsintheGraphiQL.Plug: " <>
+                "#{inspect(mod)}.#{fun}/1 or #{inspect(mod)}.#{fun}/0 is not exported"
+    end
+  end
+
+  defp call_dynamic!(_conn, _key, value), do: value
+
+  defp check_resolved!(key, resolved) do
+    case check_value(key, resolved) do
+      :ok ->
+        :ok
+
+      {:error, expected} ->
+        raise ArgumentError,
+              "invalid #{inspect(key)} option for AbsintheGraphiQL.Plug: expected the " <>
+                "function to return #{expected} or nil, got: #{inspect(resolved)}"
+    end
   end
 
   ## IDE page
@@ -465,29 +460,28 @@ defmodule AbsintheGraphiQL.Plug do
   # A protocol-relative URL ("//host/path") gets both schemes.
   defp external_origins(nil, _schemes), do: []
 
-  defp external_origins(url, [plain, secure]) do
+  defp external_origins(url, schemes) do
     uri = URI.parse(url)
-
-    schemes =
-      case uri.scheme do
-        nil -> [plain, secure]
-        scheme when scheme in ["http", "ws"] -> [plain]
-        scheme when scheme in ["https", "wss"] -> [secure]
-        _ -> []
-      end
-
-    authority =
-      cond do
-        is_nil(uri.host) or uri.host == "" -> nil
-        explicit_port?(url, uri) -> "#{host_for_csp(uri.host)}:#{uri.port}"
-        true -> host_for_csp(uri.host)
-      end
+    authority = csp_authority(url, uri)
 
     if authority && safe_host?(authority) do
-      Enum.map(schemes, &"#{&1}://#{authority}")
+      Enum.map(csp_schemes(uri.scheme, schemes), &"#{&1}://#{authority}")
     else
       []
     end
+  end
+
+  defp csp_schemes(nil, schemes), do: schemes
+  defp csp_schemes(scheme, [plain, _secure]) when scheme in ["http", "ws"], do: [plain]
+  defp csp_schemes(scheme, [_plain, secure]) when scheme in ["https", "wss"], do: [secure]
+  defp csp_schemes(_scheme, _schemes), do: []
+
+  defp csp_authority(_url, %URI{host: host}) when host in [nil, ""], do: nil
+
+  defp csp_authority(url, uri) do
+    if explicit_port?(url, uri),
+      do: "#{host_for_csp(uri.host)}:#{uri.port}",
+      else: host_for_csp(uri.host)
   end
 
   defp host_for_csp(host), do: if(String.contains?(host, ":"), do: "[#{host}]", else: host)
