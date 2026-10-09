@@ -39,40 +39,40 @@ defmodule Example.Schema do
 
   @desc "A chat message"
   object :message do
-    field :id, non_null(:id)
-    field :body, non_null(:string)
+    field(:id, non_null(:id))
+    field(:body, non_null(:string))
   end
 
   input_object :message_input do
-    field :body, non_null(:string)
+    field(:body, non_null(:string))
   end
 
   query do
     @desc "Say hello"
     field :hello, non_null(:string) do
-      arg :name, :string
-      resolve fn args, _ -> {:ok, "Hello, #{Map.get(args, :name, "world")}!"} end
+      arg(:name, :string)
+      resolve(fn args, _ -> {:ok, "Hello, #{Map.get(args, :name, "world")}!"} end)
     end
 
     @desc "All messages, oldest first"
     field :messages, non_null(list_of(non_null(:message))) do
-      resolve fn _, _ -> {:ok, Example.Store.all()} end
+      resolve(fn _, _ -> {:ok, Example.Store.all()} end)
     end
   end
 
   mutation do
     @desc "Add a message; `messageAdded` subscribers receive it"
     field :add_message, non_null(:message) do
-      arg :input, non_null(:message_input)
-      resolve fn %{input: %{body: body}}, _ -> {:ok, Example.Store.add(body)} end
+      arg(:input, non_null(:message_input))
+      resolve(fn %{input: %{body: body}}, _ -> {:ok, Example.Store.add(body)} end)
     end
   end
 
   subscription do
     @desc "Every message added with `addMessage`"
     field :message_added, non_null(:message) do
-      config fn _args, _resolution -> {:ok, topic: "messages"} end
-      trigger :add_message, topic: fn _message -> "messages" end
+      config(fn _args, _resolution -> {:ok, topic: "messages"} end)
+      trigger(:add_message, topic: fn _message -> "messages" end)
     end
   end
 end
@@ -91,18 +91,19 @@ end
 defmodule Example.Router do
   use Phoenix.Router
 
-  get "/", Example.RedirectController, :index
+  get("/", Example.RedirectController, :index)
 
-  forward "/graphiql", AbsintheGraphiQL.Plug,
+  forward("/graphiql", AbsintheGraphiQL.Plug,
     schema: Example.Schema,
     socket_url: "/socket",
     socket_params: %{"client" => "graphiql"},
     title: "Example API",
-    theme: (case System.get_env("THEME") do
-              "light" -> :light
-              "dark" -> :dark
-              _ -> :system
-            end),
+    theme:
+      case System.get_env("THEME") do
+        "light" -> :light
+        "dark" -> :dark
+        _ -> :system
+      end,
     default_query: """
     # Start the subscription, then send a message from a terminal:
     #
@@ -116,6 +117,7 @@ defmodule Example.Router do
       }
     }
     """
+  )
 end
 
 defmodule Example.RedirectController do
@@ -134,14 +136,15 @@ defmodule Example.Endpoint do
   use Phoenix.Endpoint, otp_app: :example
   use Absinthe.Phoenix.Endpoint
 
-  socket "/socket", Example.UserSocket, websocket: true, longpoll: false
+  socket("/socket", Example.UserSocket, websocket: true, longpoll: false)
 
-  plug Plug.Parsers,
+  plug(Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json, Absinthe.Plug.Parser],
     pass: ["*/*"],
     json_decoder: Jason
+  )
 
-  plug Example.Router
+  plug(Example.Router)
 end
 
 port = String.to_integer(System.get_env("PORT", "4401"))
