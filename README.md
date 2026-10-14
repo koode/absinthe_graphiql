@@ -12,7 +12,7 @@ A plug that serves the [GraphiQL 6](https://github.com/graphql/graphiql) IDE for
   (`absinthe_phoenix`).
 - A strict `content-security-policy` header by default.
 
-> **GraphiQL 6 is a release candidate.** This package bundles `graphiql@6.0.0-rc.1`
+> **GraphiQL 6 is a release candidate.** This package bundles `graphiql@6.0.0-rc.2`
 > and its `1.0.0-rc` companion packages. Expect changes when GraphiQL 6.0.0 ships.
 
 ## Installation

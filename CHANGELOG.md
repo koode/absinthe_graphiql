@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Update the bundled GraphiQL to `graphiql@6.0.0-rc.2`, with `@graphiql/react@1.0.0-rc.3`,
+  `@graphiql/plugin-query-builder@1.0.0-rc.3`, `@graphiql/plugin-history@1.0.0-rc.2` and
+  `@graphiql/plugin-doc-explorer@1.0.0-rc.2`. GraphiQL now uses the stable React Compiler
+  runtime, and the query builder follows the operation under the cursor.
+
 ## 0.1.0
 
 First release.
