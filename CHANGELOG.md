@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.1
 
 - Update the bundled GraphiQL to `graphiql@6.0.0-rc.2`, with `@graphiql/react@1.0.0-rc.3`,
   `@graphiql/plugin-query-builder@1.0.0-rc.3`, `@graphiql/plugin-history@1.0.0-rc.2` and
