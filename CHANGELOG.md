@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - Add the `:visible_plugin` option, which opens a side panel plugin (`:query_builder`,
   `:doc_explorer`, `:history` or `:collections`) when the page loads.
