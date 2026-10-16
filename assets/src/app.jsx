@@ -5,11 +5,13 @@
 
 import "graphiql/style.css";
 
+import { DOC_EXPLORER_PLUGIN } from "@graphiql/plugin-doc-explorer";
 import { COLLECTIONS_PLUGIN, GraphiQL, HISTORY_PLUGIN, QUERY_BUILDER_PLUGIN } from "graphiql";
 import { Socket } from "phoenix";
 import { createRoot } from "react-dom/client";
 
 import { createAbsintheSocketClient, createUnavailableSubscriptionClient } from "./absinthe_socket.js";
+import { graphiqlProps } from "./props.js";
 import { createAbsintheTransport } from "./transport.js";
 
 const root = document.getElementById("graphiql");
@@ -53,30 +55,14 @@ if (config.socketUrl) {
 
 const transport = createAbsintheTransport({ url, subscriptionClient });
 
-const plugins = [
-  config.history && HISTORY_PLUGIN,
-  config.queryBuilder && QUERY_BUILDER_PLUGIN,
-  config.collections && COLLECTIONS_PLUGIN,
-].filter(Boolean);
-
 const props = {
   transport,
-  plugins,
-  shouldPersistHeaders: config.shouldPersistHeaders,
-  isHeadersEditorEnabled: true,
+  ...graphiqlProps(config, {
+    query_builder: QUERY_BUILDER_PLUGIN,
+    doc_explorer: DOC_EXPLORER_PLUGIN,
+    history: HISTORY_PLUGIN,
+    collections: COLLECTIONS_PLUGIN,
+  }),
 };
-
-if (config.theme === "light" || config.theme === "dark") props.forcedTheme = config.theme;
-if (config.defaultQuery != null) props.defaultQuery = config.defaultQuery;
-if (config.defaultHeaders != null) props.defaultHeaders = config.defaultHeaders;
-if (config.defaultQuery != null || config.defaultVariables != null || config.defaultHeaders != null) {
-  props.defaultTabs = [
-    {
-      query: config.defaultQuery ?? undefined,
-      variables: config.defaultVariables ?? undefined,
-      headers: config.defaultHeaders ?? undefined,
-    },
-  ];
-}
 
 createRoot(root).render(<GraphiQL {...props} />);

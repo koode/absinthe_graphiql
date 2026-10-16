@@ -74,6 +74,8 @@ on) are accepted and passed on.
 | `:default_query` | GraphiQL's welcome text | Query of the first tab when the browser has no saved state. |
 | `:default_variables` | `nil` | Variables of that tab. A map or a JSON string. |
 | `:default_headers` | `nil` | Request headers of new tabs. A map or a JSON string. |
+| `:default_tabs` | `nil` | Tabs to open when the browser has no saved state, instead of one tab from `:default_query`. A list of maps with the optional keys `:query`, `:variables` and `:headers` (variables and headers as a map or a JSON string). A tab without `:headers` gets `:default_headers`. Cannot be used together with `:default_query` or `:default_variables`. |
+| `:visible_plugin` | `nil` | Side panel plugin to open when the page loads: `:query_builder`, `:doc_explorer`, `:history` or `:collections`. `nil` opens the plugin the user had open last time. The plugin must be enabled. |
 | `:title` | `"GraphiQL"` | Page title. |
 | `:theme` | `:system` | `:system` follows the operating system and lets the user change the theme in the settings dialog. `:light` and `:dark` force a theme and hide that setting. |
 | `:query_builder` | `true` | Show the query builder. |
@@ -82,8 +84,9 @@ on) are accepted and passed on.
 | `:should_persist_headers` | `false` | Save the headers editor in `localStorage`. Off by default because headers often hold tokens. |
 | `:csp` | `true` | `true` sends a strict `content-security-policy` header with the page, `false` sends none, a string is sent as it is. |
 
-`:default_url`, `:socket_url`, `:socket_params`, `:default_query`, `:default_variables`
-and `:default_headers` can also be a function or a `{module, function}` tuple. The plug
+`:default_url`, `:socket_url`, `:socket_params`, `:default_query`, `:default_variables`,
+`:default_headers` and `:default_tabs` can also be a function or a `{module, function}`
+tuple. The plug
 calls it for every page request: with the `Plug.Conn` when it has arity 1, with no
 arguments when it has arity 0. When a `{module, function}` tuple exports both arities,
 arity 1 is used.
@@ -97,6 +100,22 @@ def graphiql_headers(conn) do
   %{"x-csrf-token" => Plug.CSRFProtection.get_csrf_token()}
 end
 ```
+
+Open the IDE with the query builder and two example tabs:
+
+```elixir
+forward "/graphiql", AbsintheGraphiQL.Plug,
+  schema: MyAppWeb.Schema,
+  visible_plugin: :query_builder,
+  default_tabs: [
+    %{query: "query Me {\n  me {\n    id\n    name\n  }\n}\n"},
+    %{query: "query Post($id: ID!) {\n  post(id: $id) {\n    title\n  }\n}\n", variables: %{"id" => "1"}}
+  ]
+```
+
+GraphiQL saves the open tabs in `localStorage`, so `:default_query` and `:default_tabs`
+only show in a browser that has no saved tabs for the page's origin. `:visible_plugin`
+applies on every page load.
 
 GraphiQL stores the theme setting in `localStorage` under `graphiql:settings`, shared by
 every GraphiQL page on the same origin. A page with a forced `:light` or `:dark` theme

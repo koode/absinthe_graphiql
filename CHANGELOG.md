@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Add the `:visible_plugin` option, which opens a side panel plugin (`:query_builder`,
+  `:doc_explorer`, `:history` or `:collections`) when the page loads.
+- Add the `:default_tabs` option, which opens the IDE with several tabs, each with its
+  own query, variables and headers.
+
 ## 0.1.1
 
 - Update the bundled GraphiQL to `graphiql@6.0.0-rc.2`, with `@graphiql/react@1.0.0-rc.3`,

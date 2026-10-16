@@ -13,6 +13,7 @@ defmodule AbsintheGraphiQL.PlugTest do
     def socket_params, do: %{"token" => "mf-token"}
     def params_from_conn(conn), do: %{"token" => conn.assigns[:token]}
     def not_a_map, do: "nope"
+    def tabs(conn), do: [%{query: "{ hello }", headers: %{"x-path" => conn.request_path}}]
   end
 
   @html "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
@@ -101,6 +102,8 @@ defmodule AbsintheGraphiQL.PlugTest do
       assert config["defaultQuery"] == nil
       assert config["defaultVariables"] == nil
       assert config["defaultHeaders"] == nil
+      assert config["defaultTabs"] == nil
+      assert config["visiblePlugin"] == nil
 
       assert config["workers"] == %{
                "editor" => "/graphiql/__assets__/" <> Assets.entry("editor.worker.js"),
@@ -154,6 +157,59 @@ defmodule AbsintheGraphiQL.PlugTest do
 
       assert config["defaultVariables"] == ~s({"a": 1})
       assert config["defaultHeaders"] == ~s({"x": "y"})
+    end
+
+    test "encodes default_tabs, maps as JSON and strings as they are" do
+      config =
+        browser_get(
+          default_headers: %{"authorization" => "Bearer x"},
+          default_tabs: [
+            %{query: "query A { hello }", variables: %{"name" => "Ada"}},
+            %{query: "query B { hello }", variables: ~s({"a": 1}), headers: ~s({"x": "y"})},
+            %{}
+          ]
+        )
+        |> page_config()
+
+      assert [first, second, third] = config["defaultTabs"]
+      assert first["query"] == "query A { hello }"
+      assert Jason.decode!(first["variables"]) == %{"name" => "Ada"}
+      assert first["headers"] == nil
+
+      assert second == %{
+               "query" => "query B { hello }",
+               "variables" => ~s({"a": 1}),
+               "headers" => ~s({"x": "y"})
+             }
+
+      assert third == %{"query" => nil, "variables" => nil, "headers" => nil}
+      assert Jason.decode!(config["defaultHeaders"]) == %{"authorization" => "Bearer x"}
+      assert config["defaultQuery"] == nil
+    end
+
+    test "encodes an empty default_tabs list" do
+      assert browser_get(default_tabs: []) |> page_config() |> Map.fetch!("defaultTabs") == []
+    end
+
+    for plugin <- [:query_builder, :doc_explorer, :history, :collections] do
+      test "puts visible_plugin #{plugin} into the config" do
+        assert browser_get(visible_plugin: unquote(plugin))
+               |> page_config()
+               |> Map.fetch!("visiblePlugin") == Atom.to_string(unquote(plugin))
+      end
+    end
+
+    test "allows visible_plugin :doc_explorer with every optional plugin turned off" do
+      config =
+        browser_get(
+          visible_plugin: :doc_explorer,
+          query_builder: false,
+          history: false,
+          collections: false
+        )
+        |> page_config()
+
+      assert config["visiblePlugin"] == "doc_explorer"
     end
 
     for theme <- [:system, :light, :dark] do
@@ -217,6 +273,26 @@ defmodule AbsintheGraphiQL.PlugTest do
 
       assert config["url"] == "/api/graphql"
       assert config["socketUrl"] == "/live"
+    end
+
+    test "default_tabs as a function and as {module, function}" do
+      tabs = fn -> [%{query: "{ fun }"}] end
+
+      assert [%{"query" => "{ fun }"}] =
+               browser_get(default_tabs: tabs) |> page_config() |> Map.fetch!("defaultTabs")
+
+      assert [%{"query" => "{ hello }", "headers" => headers}] =
+               browser_get(default_tabs: {Callbacks, :tabs})
+               |> page_config()
+               |> Map.fetch!("defaultTabs")
+
+      assert Jason.decode!(headers) == %{"x-path" => "/graphiql"}
+    end
+
+    test "default_tabs from a function is checked when it is called" do
+      assert_raise ArgumentError,
+                   ~r/invalid :default_tabs option .* expected the function to return a list of maps/,
+                   fn -> browser_get(default_tabs: fn -> [%{query: 1}] end) end
     end
 
     test "a function returning the wrong type raises a clear error" do
@@ -502,6 +578,71 @@ defmodule AbsintheGraphiQL.PlugTest do
 
       assert_raise ArgumentError, ~r/invalid :default_url option/, fn ->
         AbsintheGraphiQL.Plug.init(schema: Schema, default_url: fn _a, _b -> "x" end)
+      end
+    end
+
+    test "rejects bad default_tabs" do
+      for tabs <- [
+            %{query: "{ a }"},
+            [%{query: 1}],
+            [%{variables: [a: 1]}],
+            [%{headers: 1}],
+            [%{"query" => "{ a }"}],
+            [%{query: "{ a }", operation_name: "A"}],
+            ["{ a }"],
+            [~D[2026-01-01]]
+          ] do
+        assert_raise ArgumentError,
+                     ~r/invalid :default_tabs option .* expected a list of maps with the optional keys :query/,
+                     fn -> AbsintheGraphiQL.Plug.init(schema: Schema, default_tabs: tabs) end
+      end
+    end
+
+    test "rejects default_tabs together with default_query or default_variables" do
+      for {key, value} <- [default_query: "{ hello }", default_variables: %{"a" => 1}] do
+        assert_raise ArgumentError,
+                     "the :default_tabs and #{inspect(key)} options of AbsintheGraphiQL.Plug cannot be " <>
+                       "used together: put the query and variables in the first tab of :default_tabs",
+                     fn ->
+                       AbsintheGraphiQL.Plug.init([
+                         {:schema, Schema},
+                         {:default_tabs, [%{}]},
+                         {key, value}
+                       ])
+                     end
+      end
+    end
+
+    test "allows default_tabs together with default_headers" do
+      assert %{graphiql: %{default_tabs: [%{}], default_headers: %{"a" => "b"}}} =
+               AbsintheGraphiQL.Plug.init(
+                 schema: Schema,
+                 default_tabs: [%{}],
+                 default_headers: %{"a" => "b"}
+               )
+    end
+
+    test "rejects an unknown visible_plugin" do
+      for plugin <- [:explorer, "query_builder", true] do
+        assert_raise ArgumentError,
+                     "invalid :visible_plugin option for AbsintheGraphiQL.Plug: expected nil, :query_builder, " <>
+                       ":doc_explorer, :history or :collections, got: #{inspect(plugin)}",
+                     fn -> AbsintheGraphiQL.Plug.init(schema: Schema, visible_plugin: plugin) end
+      end
+    end
+
+    test "rejects a visible_plugin that is turned off" do
+      for plugin <- [:query_builder, :history, :collections] do
+        assert_raise ArgumentError,
+                     "invalid :visible_plugin option for AbsintheGraphiQL.Plug: the #{inspect(plugin)} " <>
+                       "plugin is turned off with `#{plugin}: false`",
+                     fn ->
+                       AbsintheGraphiQL.Plug.init([
+                         {:schema, Schema},
+                         {:visible_plugin, plugin},
+                         {plugin, false}
+                       ])
+                     end
       end
     end
 

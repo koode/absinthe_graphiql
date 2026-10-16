@@ -47,6 +47,17 @@ defmodule AbsintheGraphiQL.Plug do
       JSON) or a JSON string.
     * `:default_headers` - the request headers of new tabs. A map of header
       names to values (encoded as JSON) or a JSON string.
+    * `:default_tabs` - the tabs the IDE opens with when the browser has no
+      saved state, instead of one tab from `:default_query`. A list of maps
+      with the optional keys `:query` (a string), `:variables` and `:headers`
+      (each a map or a JSON string, like `:default_variables`). A tab without
+      `:headers` gets `:default_headers`. You cannot use it together with
+      `:default_query` or `:default_variables`.
+    * `:visible_plugin` - the side panel plugin that is open when the page
+      loads: `:query_builder`, `:doc_explorer`, `:history` or `:collections`.
+      Defaults to `nil`, which opens the plugin the user had open last time.
+      The plugin must be enabled, so `visible_plugin: :history` together with
+      `history: false` is an error.
     * `:title` - the page title. Defaults to `"GraphiQL"`.
     * `:theme` - `:system` (default) follows the operating system and lets the
       user pick a theme in the settings dialog. `:light` and `:dark` force
@@ -62,8 +73,8 @@ defmodule AbsintheGraphiQL.Plug do
       is sent as it is.
 
   `:default_url`, `:socket_url`, `:socket_params`, `:default_query`,
-  `:default_variables` and `:default_headers` can also be a function or a
-  `{module, function}` tuple. It is called for every page request, with the
+  `:default_variables`, `:default_headers` and `:default_tabs` can also be a
+  function or a `{module, function}` tuple. It is called for every page request, with the
   `Plug.Conn` when it has arity 1 and with no arguments when it has arity 0:
 
       forward "/graphiql", AbsintheGraphiQL.Plug,
@@ -92,7 +103,8 @@ defmodule AbsintheGraphiQL.Plug do
     :socket_params,
     :default_query,
     :default_variables,
-    :default_headers
+    :default_headers,
+    :default_tabs
   ]
 
   @boolean_options [
@@ -104,10 +116,27 @@ defmodule AbsintheGraphiQL.Plug do
 
   @themes [:system, :light, :dark]
 
+  # Plugins that :visible_plugin can name, with the boolean option that
+  # enables each one. The documentation explorer is built into GraphiQL.
+  @plugins [
+    query_builder: :query_builder,
+    doc_explorer: nil,
+    history: :history,
+    collections: :collections
+  ]
+
+  @tab_keys [:query, :variables, :headers]
+
   @asset_cache_control "public, max-age=31536000, immutable"
 
   @type dynamic(value) ::
           value | (-> value) | (Plug.Conn.t() -> value) | {module(), atom()}
+
+  @type tab :: %{
+          optional(:query) => String.t() | nil,
+          optional(:variables) => map() | String.t() | nil,
+          optional(:headers) => map() | String.t() | nil
+        }
 
   @type opts :: [
           {:default_url, dynamic(String.t())}
@@ -117,6 +146,8 @@ defmodule AbsintheGraphiQL.Plug do
           | {:default_query, dynamic(String.t())}
           | {:default_variables, dynamic(map() | String.t())}
           | {:default_headers, dynamic(map() | String.t())}
+          | {:default_tabs, dynamic([tab()])}
+          | {:visible_plugin, :query_builder | :doc_explorer | :history | :collections | nil}
           | {:title, String.t()}
           | {:theme, :system | :light | :dark}
           | {:query_builder, boolean()}
@@ -182,6 +213,8 @@ defmodule AbsintheGraphiQL.Plug do
         {key, value}
       end)
 
+    validate_tab_options!(dynamic)
+
     booleans =
       Map.new(@boolean_options, fn {key, default} ->
         {key, fetch_valid!(opts, key, default, &is_boolean/1, "a boolean")}
@@ -217,8 +250,42 @@ defmodule AbsintheGraphiQL.Plug do
           &(is_boolean(&1) or is_binary(&1)),
           "true, false or a policy string"
         ),
+      visible_plugin: fetch_visible_plugin!(opts, booleans),
       static: static
     })
+  end
+
+  defp validate_tab_options!(%{default_tabs: nil}), do: :ok
+
+  defp validate_tab_options!(dynamic) do
+    for key <- [:default_query, :default_variables], dynamic[key] != nil do
+      raise ArgumentError,
+            "the :default_tabs and #{inspect(key)} options of AbsintheGraphiQL.Plug cannot " <>
+              "be used together: put the query and variables in the first tab of :default_tabs"
+    end
+
+    :ok
+  end
+
+  defp fetch_visible_plugin!(opts, booleans) do
+    plugin =
+      fetch_valid!(
+        opts,
+        :visible_plugin,
+        nil,
+        &(&1 in [nil | Keyword.keys(@plugins)]),
+        "nil, :query_builder, :doc_explorer, :history or :collections"
+      )
+
+    enabled_by = plugin && Keyword.fetch!(@plugins, plugin)
+
+    if enabled_by && not Map.fetch!(booleans, enabled_by) do
+      raise ArgumentError,
+            "invalid :visible_plugin option for AbsintheGraphiQL.Plug: the #{inspect(plugin)} " <>
+              "plugin is turned off with `#{enabled_by}: false`"
+    end
+
+    plugin
   end
 
   defp fetch_valid!(opts, key, default, valid?, expected) do
@@ -253,8 +320,29 @@ defmodule AbsintheGraphiQL.Plug do
   end
 
   defp check_value(key, value) when key in [:default_variables, :default_headers] do
-    if is_map(value) or is_binary(value), do: :ok, else: {:error, "a map or a JSON string"}
+    if json_value?(value), do: :ok, else: {:error, "a map or a JSON string"}
   end
+
+  defp check_value(:default_tabs, value) do
+    if is_list(value) and Enum.all?(value, &tab?/1),
+      do: :ok,
+      else:
+        {:error,
+         "a list of maps with the optional keys :query (a string), :variables and :headers " <>
+           "(a map or a JSON string)"}
+  end
+
+  defp json_value?(value), do: is_map(value) or is_binary(value)
+
+  defp tab?(tab) when is_map(tab) and not is_struct(tab) do
+    Enum.all?(tab, fn
+      {:query, query} -> query == nil or is_binary(query)
+      {key, value} when key in @tab_keys -> value == nil or json_value?(value)
+      _other -> false
+    end)
+  end
+
+  defp tab?(_tab), do: false
 
   @spec invalid!(atom(), term(), String.t()) :: no_return()
   defp invalid!(key, value, expected) do
@@ -333,6 +421,8 @@ defmodule AbsintheGraphiQL.Plug do
       defaultQuery: resolved.default_query,
       defaultVariables: json_text(resolved.default_variables, config),
       defaultHeaders: json_text(resolved.default_headers, config),
+      defaultTabs: tabs_config(resolved.default_tabs, config),
+      visiblePlugin: opts.visible_plugin,
       workers: %{
         editor: asset_url(mount, Assets.entry("editor.worker.js")),
         json: asset_url(mount, Assets.entry("json.worker.js")),
@@ -347,6 +437,18 @@ defmodule AbsintheGraphiQL.Plug do
     |> put_resp_header("cache-control", "no-store")
     |> put_csp(opts.csp, default_url, socket_url)
     |> send_resp(200, html)
+  end
+
+  defp tabs_config(nil, _config), do: nil
+
+  defp tabs_config(tabs, config) do
+    Enum.map(tabs, fn tab ->
+      %{
+        query: tab[:query],
+        variables: json_text(tab[:variables], config),
+        headers: json_text(tab[:headers], config)
+      }
+    end)
   end
 
   defp json_text(nil, _config), do: nil
