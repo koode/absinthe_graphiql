@@ -104,19 +104,36 @@ defmodule Example.Router do
         "dark" -> :dark
         _ -> :system
       end,
-    default_query: """
-    # Start the subscription, then send a message from a terminal:
-    #
-    #   curl -s localhost:4401/graphiql -H 'content-type: application/json' \\
-    #     -d '{"query":"mutation { addMessage(input: {body: \\"hi\\"}) { id body } }"}'
+    visible_plugin: :query_builder,
+    default_tabs: [
+      %{
+        query: """
+        # Start the subscription, then send a message from a terminal:
+        #
+        #   curl -s localhost:4401/graphiql -H 'content-type: application/json' \\
+        #     -d '{"query":"mutation { addMessage(input: {body: \\"hi\\"}) { id body } }"}'
 
-    subscription OnMessage {
-      messageAdded {
-        id
-        body
+        subscription OnMessage {
+          messageAdded {
+            id
+            body
+          }
+        }
+        """
+      },
+      %{
+        query: """
+        query Hello($name: String) {
+          hello(name: $name)
+          messages {
+            id
+            body
+          }
+        }
+        """,
+        variables: %{"name" => "Ada"}
       }
-    }
-    """
+    ]
   )
 end
 
